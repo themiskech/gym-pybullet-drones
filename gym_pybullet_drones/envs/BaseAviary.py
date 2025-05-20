@@ -132,7 +132,7 @@ class BaseAviary(gym.Env):
             os.makedirs(os.path.dirname(self.ONBOARD_IMG_PATH), exist_ok=True)
         self.VISION_ATTR = vision_attributes
         if self.VISION_ATTR:
-            self.IMG_RES = np.array([64, 48])
+            self.IMG_RES = np.array([256, 256])
             self.IMG_FRAME_PER_SEC = 24
             self.IMG_CAPTURE_FREQ = int(self.PYB_FREQ/self.IMG_FRAME_PER_SEC)
             self.rgb = np.zeros(((self.NUM_DRONES, self.IMG_RES[1], self.IMG_RES[0], 4)))
@@ -503,8 +503,34 @@ class BaseAviary(gym.Env):
             # p.setCollisionFilterPair(bodyUniqueIdA=self.PLANE_ID, bodyUniqueIdB=self.DRONE_IDS[i], linkIndexA=-1, linkIndexB=-1, enableCollision=0, physicsClientId=self.CLIENT)
         if self.OBSTACLES:
             self._addObstacles()
-    
-    ################################################################################
+        
+    #             """
+    #     Προσθήκη εμποδίων στο περιβάλλον (URDF objects).
+    #     """
+
+
+    #     # ----------- Τείχος από κύβους (κάθετος τοίχος μπροστά) -----------
+    #     for i in range(5):
+    #         p.loadURDF("cube_small.urdf",
+    #                    [3.5, -0.3 + i * 0.15, 0.1],
+    #                    p.getQuaternionFromEuler([0, 0, 0]),
+    #                    physicsClientId=self.CLIENT)
+
+    #     # ----------- Κάποιοι κύβοι σε διάφορα σημεία -----------
+    #     p.loadURDF("cube_no_rotation.urdf", [1.0, 0.5, 0.1], p.getQuaternionFromEuler([0, 0, 0]), physicsClientId=self.CLIENT)
+    #     p.loadURDF("cube_no_rotation.urdf", [2.0, -0.8, 0.1], p.getQuaternionFromEuler([0, 0, 0]), physicsClientId=self.CLIENT)
+
+    #     # ----------- Μπάλες ως σφαίρες -----------
+    #     p.loadURDF("sphere2.urdf", [1.5, 0.0, 0.3], p.getQuaternionFromEuler([0, 0, 0]), physicsClientId=self.CLIENT)
+    #     p.loadURDF("sphere2.urdf", [2.5, -0.4, 0.3], p.getQuaternionFromEuler([0, 0, 0]), physicsClientId=self.CLIENT)
+
+    #     # ----------- Οπτικό στοιχείο στόχος (π.χ. πάπια ή teddy) -----------
+    #     p.loadURDF("duck_vhacd.urdf", [4.5, 0.0, 0.05], p.getQuaternionFromEuler([0, 0, 0]), physicsClientId=self.CLIENT)
+
+    #     # ----------- Οπτικό στοιχείο εκκίνησης -----------
+    #     p.loadURDF("samurai.urdf", [0.0, 0.0, 0.05], p.getQuaternionFromEuler([0, 0, 0]), physicsClientId=self.CLIENT)
+   
+    # ################################################################################
 
     def _updateAndStoreKinematicInformation(self):
         """Updates and stores the drones kinemaatic information.
