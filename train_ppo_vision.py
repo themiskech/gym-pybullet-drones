@@ -1,42 +1,75 @@
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-os.environ["PYBULLET_EGL"] = "1"  
 import torch
-from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv
+import gymnasium as gym
+import numpy as np
+from sb3_contrib.ppo_recurrent import RecurrentPPO
+from sb3_contrib.ppo_recurrent.policies import RecurrentActorCriticPolicy
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecTransposeDict
 from gym_pybullet_drones.envs.VisionAviary import VisionAviary
 
-# --- Parameters ---
-TOTAL_TIMESTEPS = 500_000
-MODEL_DIR = "./ppo_drone_vision_model"
-os.makedirs(MODEL_DIR, exist_ok=True)
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-# --- Env factory ---
+class CustomCNN(BaseFeaturesExtractor):
+    def __init__(self, observation_space: gym.spaces.Dict, features_dim: int = 256):
+        super().__init__(observation_space, features_dim)
+        n_input_channels = observation_space["image"].shape[0]
+        self.cnn = torch.nn.Sequential(
+            torch.nn.Conv2d(n_input_channels, 32, kernel_size=8, stride=4),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            torch.nn.ReLU(),
+            torch.nn.Flatten()
+        )
+        with torch.no_grad():
+            sample = torch.zeros(1, *observation_space["image"].shape)
+            n_flatten = self.cnn(sample).shape[1]
+
+        self.linear = torch.nn.Sequential(
+            torch.nn.Linear(n_flatten + observation_space["goal"].shape[0], features_dim),
+            torch.nn.ReLU()
+        )
+
+    def forward(self, observations):
+        cnn_out = self.cnn(observations["image"])
+        goal = observations["goal"]
+        return self.linear(torch.cat([cnn_out, goal], dim=1))
+
 def make_env():
-    return VisionAviary(gui=False, obstacles=True)
+    def _init():
+        return VisionAviary(gui=False, record=False, obstacles=True)
+    return _init
 
-# --- Vec env ---
-env = DummyVecEnv([make_env])
+if __name__ == "__main__":
+    env = SubprocVecEnv([make_env()])
+    env = VecTransposeDict(env)
 
-# --- PPO Model ---
-model = PPO(
-    policy="MultiInputPolicy",
-    env=env,
-    verbose=1,
-    tensorboard_log=None,
-    learning_rate=5e-4,
-    n_steps=512,
-    batch_size=64,
-    n_epochs=4,
-    gamma=0.99,
-    gae_lambda=0.95,
-    clip_range=0.2,
-    device="cuda" if torch.cuda.is_available() else "cpu"
-)
+    model = RecurrentPPO(
+        policy=RecurrentActorCriticPolicy,
+        env=env,
+        verbose=1,
+        tensorboard_log="./ppo_drone_tensorboard/",
+        learning_rate=0.0003,
+        n_steps=1024,
+        batch_size=64,
+        n_epochs=10,
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        policy_kwargs=dict(
+            features_extractor_class=CustomCNN,
+            features_extractor_kwargs=dict(features_dim=256),
+            net_arch=dict(pi=[128, 64], vf=[128, 64])
+        )
+    )
 
-# --- Train ---
-model.learn(total_timesteps=TOTAL_TIMESTEPS)
+    checkpoint_callback = CheckpointCallback(
+        save_freq=10000,
+        save_path="./ppo_checkpoints/",
+        name_prefix="drone_model"
+    )
 
-# --- Save model ---
-model.save(os.path.join(MODEL_DIR, "final_model"))
-env.close()
+    model.learn(total_timesteps=500_000, callback=checkpoint_callback)
+    model.save("ppo_drone_final")
+
