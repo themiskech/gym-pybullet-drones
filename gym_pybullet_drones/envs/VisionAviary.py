@@ -2,7 +2,7 @@ import numpy as np
 from gym import spaces
 import pybullet as p
 from gym_pybullet_drones.envs.BaseRLAviary import BaseRLAviary
-from gym_pybullet_drones.utils.enums import DroneModel
+from gym_pybullet_drones.utils.enums import DroneModel, Physics
 
 
 class VisionAviary(BaseRLAviary):
@@ -12,7 +12,7 @@ class VisionAviary(BaseRLAviary):
             num_drones=1,
             neighbourhood_radius=10,
             initial_xyzs=np.array([[1, 1, 1]]),
-            physics="pyb",
+            physics=Physics.PYB,
             gui=gui,
             record=record
         )
